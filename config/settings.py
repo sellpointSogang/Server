@@ -28,7 +28,8 @@ def get_env_variable(var_name):
 
 SECRET_KEY = get_env_variable('DJANGO_SECRET')
 # SECRET_KEY = os.getenv("SECRET_KEY")
-
+if settings.DEBUG:
+    urlpatterns += [url(r'^__debug__/', include(debug_toolbar.urls))
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = False
 DEBUG = True

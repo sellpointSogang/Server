@@ -37,6 +37,13 @@ ALLOWED_HOSTS = ['*']
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF 신뢰할 수 있는 출처
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:8000",
+    "https://port-0-server-bkcl2bloy31e46.sel5.cloudtype.app",
+]
+
 # Application definition
 
 INSTALLED_APPS = [

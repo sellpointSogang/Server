@@ -10,5 +10,5 @@ router.register(r"writes", WritesViewSet)
 
 urlpatterns = [
     path("", include(router.urls)),
-    path("<int:report_id>/points", ReportPointView.as_view(), name="report-points"),
+    path("<int:report_id>/points/", ReportPointView.as_view(), name="report-points"),
 ]

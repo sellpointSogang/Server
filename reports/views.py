@@ -1,6 +1,7 @@
 from django.db.models import Min
 from rest_framework import viewsets, generics
 from rest_framework import filters as drf_filters
+from django.db.models import Q  ## OR filter 구현 시 장고가 추천하는 클래스
 
 from reports.serializers import (
     PointSerializer,
@@ -47,8 +48,19 @@ class StockReportsView(generics.ListAPIView):
 
     def get_queryset(self):
         stock_id = self.kwargs["pk"]
+        query = self.request.query_params.get("query")
 
-        return Report.objects.filter(stock_id=stock_id)
+        ## 리포트 제목, 소속기관, 애널리스트명 쿼리 최적화 없이 진행
+        if query is not None:
+            return Report.objects.filter(
+                Q(stock_id=stock_id),
+                Q(title__icontains=query)
+                | Q(writes__analyst__name__icontains=query)
+                | Q(writes__analyst__company__icontains=query),
+            )
+
+        else:
+            return Report.objects.filter(stock_id=stock_id)
 
 
 class AnalystReportFilter(filters.FilterSet):
@@ -74,7 +86,17 @@ class AnalystReportsView(generics.ListAPIView):
 
     def get_queryset(self):
         analyst_id = self.kwargs["pk"]
-        return Report.objects.filter(writes__analyst_id=analyst_id)
+        query = self.request.query_params.get("query")
+
+        ## 리포트 제목, 종목 쿼리 최적화 없이 진행
+        if query is not None:
+            return Report.objects.filter(
+                Q(writes__analyst_id=analyst_id),
+                Q(title__icontains=query) | Q(stock__name__icontains=query),
+            )
+
+        else:
+            return Report.objects.filter(writes__analyst_id=analyst_id)
 
 
 class StockViewSet(viewsets.ReadOnlyModelViewSet):

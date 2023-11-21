@@ -13,26 +13,30 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 import pymysql
+
 pymysql.install_as_MySQLdb()
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 from django.core.exceptions import ImproperlyConfigured
-def get_env_variable(var_name):
-  try:
-    return os.environ[var_name]
-  except KeyError:
-    error_msg = 'Set the {} environment variable'.format(var_name)
-    raise ImproperlyConfigured(error_msg)
 
-SECRET_KEY = get_env_variable('DJANGO_SECRET')
+
+def get_env_variable(var_name):
+    try:
+        return os.environ[var_name]
+    except KeyError:
+        error_msg = "Set the {} environment variable".format(var_name)
+        raise ImproperlyConfigured(error_msg)
+
+
+SECRET_KEY = get_env_variable("DJANGO_SECRET")
 # SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = False
-DEBUG = True
+DEBUG = False
+# DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["*"]
 
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
@@ -57,13 +61,14 @@ INSTALLED_APPS = [
     "rest_framework",
     "reports",
     "analysts",
-    'corsheaders',
+    "corsheaders",
     "django_filters",
     "stocks",
+    "search",
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', 
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     'debug_toolbar.middleware.DebugToolbarMiddleware',
@@ -72,7 +77,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    'whitenoise.middleware.WhiteNoiseMiddleware'
+    "whitenoise.middleware.WhiteNoiseMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -100,7 +105,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
+    "default": {
         # 'ENGINE': 'django.db.backends.mysql', # engine: mysql
         # 'NAME' : os.getenv("DB_NAME"), # DB Name
         # 'USER' : os.getenv("DB_USER"), # DB User
@@ -110,15 +115,13 @@ DATABASES = {
         # 'OPTIONS':{
         #     'init_command' : "SET sql_mode='STRICT_TRANS_TABLES'"
         # }
-        'ENGINE': 'django.db.backends.mysql',
-	'NAME': get_env_variable('DATABASE'),
-        'USER': get_env_variable('DB_USER'),
-        'PASSWORD': get_env_variable('DB_PASSWORD'),
-        'HOST': get_env_variable('DB_HOST'),
-        'PORT': get_env_variable('DB_PORT'),
-        'OPTIONS':{
-            'init_command' : "SET sql_mode='STRICT_TRANS_TABLES'"
-        }
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": get_env_variable("DATABASE"),
+        "USER": get_env_variable("DB_USER"),
+        "PASSWORD": get_env_variable("DB_PASSWORD"),
+        "HOST": get_env_variable("DB_HOST"),
+        "PORT": get_env_variable("DB_PORT"),
+        "OPTIONS": {"init_command": "SET sql_mode='STRICT_TRANS_TABLES'"},
     }
 }
 
@@ -156,11 +159,11 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
-STATIC_URL = '/static/'
+STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from reports.models import *
 from analysts.serializers import *
+from stocks.serializer import StockSerializer
 
 
 class CurrencySerializer(serializers.ModelSerializer):
@@ -12,12 +13,6 @@ class CurrencySerializer(serializers.ModelSerializer):
 class ReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
-        fields = "__all__"
-
-
-class StockSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Stock
         fields = "__all__"
 
 
@@ -59,6 +54,7 @@ class StockReportSerializer(serializers.ModelSerializer, PointsMixin):
         model = Report
         fields = [
             "id",
+            "title",
             "points",
             "target_price",
             "publish_date",
@@ -106,6 +102,7 @@ class AnalystReportSerializer(serializers.ModelSerializer, PointsMixin):
         model = Report
         fields = [
             "id",
+            "title",
             "points",
             "target_price",
             "publish_date",

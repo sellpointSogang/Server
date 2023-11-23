@@ -6,9 +6,9 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import xml.etree.ElementTree as ET  ## XML 데이터 파싱을 위한 패키지
 from django.db.models import Count, Sum
+from analyzer.analyze import analyze_pdf
 
 from reports.models import Analyst, Currency, Point, Report, Stock, Writes
-from test_code.analyze import analyze, read_pdf
 
 
 ## stock : 주식 이름
@@ -32,6 +32,9 @@ def get_price_on_publish(stock, date):
     try:
         ## GET 요청 보내기
         response = requests.get(stockPriceApiBaseurl, params=params)
+        if response.status_code != 200:
+            print(f"failed to get price of stock. GET failed {stockPriceApiBaseurl}")
+            return None
 
         ## XML로 반환된 데이터의 내용 추출하기 위한 처리
         xml_data = response.content
@@ -64,6 +67,9 @@ def get_stock_code(stock_name):
     try:
         ## GET 요청 보내기
         response = requests.get(stockPriceApiBaseurl, params=params)
+        if response.status_code != 200:
+            print(f"failed to get stock code. GET failed {stockPriceApiBaseurl}")
+            return None
 
         ## XML로 반환된 데이터의 내용 추출하기 위한 처리
         xml_data = response.content
@@ -228,7 +234,7 @@ def get_report_detail_info(report_detail_page_url):
     return None
 
 
-def fetch_stock_reports(stock_name, currency="KRW"):
+def fetch_stock_reports(stock_name, currency="KRW", max_reports_num=-1):
     # Get stock code from stock name
     stock_code = get_stock_code(stock_name)
     if stock_code is None:
@@ -246,11 +252,15 @@ def fetch_stock_reports(stock_name, currency="KRW"):
         name=stock_name, code=stock_code, currency=currency_instance
     )
 
+    saved_reports_num = 0
     page_num = 1
 
-    while True:
+    while max_reports_num == -1 or saved_reports_num < max_reports_num:
         url = f"https://finance.naver.com/research/company_list.naver?keyword=&brokerCode=&writeFromDate=&writeToDate=&searchType=itemCode&itemCode={stock_code}&page={page_num}"
         response = requests.get(url)
+        if response.status_code != 200:
+            print(f"failed to get reports list page. GET failed for {url}")
+            return None
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Find the reports table
@@ -258,6 +268,9 @@ def fetch_stock_reports(stock_name, currency="KRW"):
 
         # Iterate over each row in the table body (skipping header and empty rows)
         for row in reports_table.find_all("tr"):
+            if saved_reports_num >= max_reports_num:
+                break
+
             columns = row.find_all("td")
 
             # Skip if it's an empty row or header
@@ -273,19 +286,31 @@ def fetch_stock_reports(stock_name, currency="KRW"):
 
             report_title = report_url_elem.text if report_url_elem else None
             if report_title is None:
+                print(f"Unexpected page form around report title")
+                print(f"URL was {url}")
+                print(f"Skipping this report")
                 continue
 
             analyst_company = columns[2].text.strip()
             if analyst_company is None:
+                print(f"Unexpected page form around analyst company")
+                print(f"URL was {url}")
+                print(f"Skipping this report")
                 continue
 
             file_url_elem = columns[3].find("a")
             report_url = file_url_elem["href"] if file_url_elem else None
             if report_url is None:
+                print(f"Unexpected page form around report url")
+                print(f"URL was {url}")
+                print(f"Skipping this report")
                 continue
 
             publish_date_text = columns[4].text.strip()
             if len(publish_date_text) == 0:
+                print(f"Unexpected page form around report publish date")
+                print(f"URL was {url}")
+                print(f"Skipping this report")
                 continue
             publish_date = text_to_date(publish_date_text)
 
@@ -293,26 +318,29 @@ def fetch_stock_reports(stock_name, currency="KRW"):
             if Report.objects.filter(
                 title=report_title, publish_date=publish_date
             ).exists():
+                print(f"Skipping existing report with title {report_title}")
                 continue
 
-            negative_points = []
-            analyst_names = set()
-            text_per_page = read_pdf(report_url)
-            for text in text_per_page:
-                analysis = analyze(text)
-                for neg_point in analysis["reasons"]:
-                    negative_points.append(neg_point)
-                for analyst in analysis["writers"]:
-                    analyst_names.add(analyst)
+            analysis = analyze_pdf(report_url)
+            negative_points = analysis["negative points"]
+            analyst_names = analysis["writers"]
 
             report_detail = get_report_detail_info(report_detail_page_url)
             if report_detail is None:
-                break
+                print("Unexpected page form in report details")
+                print(f"URL was {report_detail_page_url}")
+                print(f"Skipping this report")
+                continue
 
             target_price, written_sentiment = report_detail
             target_price = Decimal(target_price)
 
             # report object with missing hidden_sentiment, is_newest, next_publish_date
+            price_on_publish = get_price_on_publish(stock, publish_date)
+            if price_on_publish is None:
+                print(f"Failed to get price on publish of report {report_title}")
+                print(f"Skipping this report")
+                continue
             report = Report(
                 title=report_title,
                 stock=stock,
@@ -320,7 +348,7 @@ def fetch_stock_reports(stock_name, currency="KRW"):
                 target_price=target_price,
                 publish_date=publish_date,
                 written_sentiment=written_sentiment,
-                price_on_publish=get_price_on_publish(stock, publish_date),
+                price_on_publish=price_on_publish,
             )
 
             # save analaysts to DB
@@ -334,7 +362,8 @@ def fetch_stock_reports(stock_name, currency="KRW"):
             except Exception as e:
                 print(f"Exception on saving analysts: {analyst}")
                 print(e)
-                break
+                print(f"Skipping this report")
+                continue
 
             hidden_sentiment = get_hidden_sentiment(
                 report=report, analysts=analyst_list
@@ -350,10 +379,13 @@ def fetch_stock_reports(stock_name, currency="KRW"):
             # save report to DB
             try:
                 report.save()
+                saved_reports_num += 1
             except Exception as e:
                 print(f"Exception on saving report: {report}")
                 print(e)
-                break
+                print(f"IMPORTANT: analysts are saved but report is not. revise this report")
+                print(f"Continuing to next report")
+                continue
 
             # connect analaysts and report on DB
             try:
@@ -362,7 +394,9 @@ def fetch_stock_reports(stock_name, currency="KRW"):
             except Exception as e:
                 print(f"Exception on saving 'Writes': {report} {analyst}")
                 print(e)
-                break
+                print(f"IMPORTANT: analysts and reports are saved, but 'writes' is not. revise this report")
+                print(f"Continuing to next report")
+                continue
 
             # save negative points on DB
             try:
@@ -375,12 +409,15 @@ def fetch_stock_reports(stock_name, currency="KRW"):
             except Exception as e:
                 print(f"Exception on saving 'Point': {point}")
                 print(e)
+                print(f"IMPORTANT: analysts, reports, and writes are saved, but points are not. revise this report")
+                print(f"Continuing to next report")
                 break
 
             # Print results
-            print(f"Saved report: {report}")
-            print(f"By analysts: {analyst_list}")
-            print(f"Points on report: {point_list}")
+            print(f"\nSaved: ")
+            print(f"    report: {report}")
+            print(f"    by analysts: {analyst_list}")
+            print(f"    with points: {point_list}", end="\n\n")
 
         # 다음 페이지 없음을 의미
         if not soup.select_one("table.Nnavi td.pgRR"):
@@ -638,7 +675,7 @@ def calculate_hit_rate_of_analyst():
             analyst.save()
             calculationSuccess += 1
         except Exception as e:
-            print(f"Exception on saving report: {report}")
+            print(f"Exception on saving analyst: {analyst}")
             print(e)
             break
 

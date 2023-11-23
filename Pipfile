@@ -33,6 +33,7 @@ yarl="*"
 mysqlclient="*"
 pymysql="*"
 django-filter = "*"
+django-cors-headers = "*"
 
 [dev-packages]
 django-debug-toolbar = "*"

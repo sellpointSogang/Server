@@ -11,7 +11,6 @@ import json
 ## 커밋 테스트용 주석2
 load_dotenv()
 
-
 def analyze(text):
     try:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -34,11 +33,12 @@ def analyze(text):
                 "role": "user",
                 "content": 
                 """
-                    Analyze this stock analysis.
-                    Find out reasons to sell this stock.
-                    Find out writers of this report, not the company they are working for.
-                    Find out companies.
-                    Respond appropriately to the format
+                    Read the following stock analysis report and find the following data sets.
+                    Find out all the negative reasons to sell this stock from the report. Only gather data from the sentences and not the tables and graphs.
+                    Find our the Author of the report. if it's multiple find all of them.
+                    Find out which company the report is writing about.
+                    Respond appropriately to the format.
+                    Do not fake answers. IF not found, tell me that it was not found.
                 """,
             },
             {
@@ -61,6 +61,7 @@ def analyze(text):
         response = client.chat.completions.create(
             model="gpt-3.5-turbo", messages=messages, temperature=0
         )
+        print("answer")
         answer = response.choices[0].message.content
         print(answer)
         result = json.loads(answer)
@@ -79,37 +80,33 @@ def analyze(text):
             "writers": [],
         }
 
-
 def preprocessing(page_text):
     cleaned_text = re.sub(r"[\n\t]", " ", page_text)
     return cleaned_text
 
-
 def read_pdf(pdf_url):
     pdf_response = requests.get(pdf_url)
     if pdf_response.status_code != 200:
-        print(f"PDF 다운로드에 실패하였습니다. 상태 코드: {pdf_response.status_code}")
+        print(f"PDF download failed. Status code: {pdf_response.status_code}")
+        return []
+
     try:
         pdf_data = BytesIO(pdf_response.content)
         pdf_reader = PyPDF2.PdfReader(pdf_data)
         num_pages = len(pdf_reader.pages)
-        print(f"총 페이지 수: {num_pages}")
-        text_list = []
-        temp = ""
-        max_length = 1800
-        for page_number in range(num_pages):
-            page = pdf_reader.pages[page_number]
-            page_text = preprocessing(page.extract_text())
-            temp += page_text
-            while len(temp) >= 2000:
-                text_list.append(temp[:max_length])
-                temp = temp[max_length:]
-        text_list.append(temp)
-        return text_list
+        print(f"Total number of pages: {num_pages}")
+
+        # Process only the first page
+        if num_pages > 0:
+            first_page = pdf_reader.pages[0]
+            page_text = preprocessing(first_page.extract_text())  # Assuming 'preprocessing' is defined
+            return [page_text]
+        else:
+            return []
+
     except Exception as e:
         print(e)
-        return ""
-
+        return []
 
 def crawl_pdf_link(url):
     try:
@@ -163,7 +160,6 @@ def crawl_pdf_link(url):
         print(e)
         return ""
 
-
 if __name__ == "__main__":
     start_url = "https://finance.naver.com/research/company_list.naver?keyword=&brokerCode=&writeFromDate=&writeToDate=&searchType=itemCode&itemName=%C4%AB%C4%AB%BF%C0&itemCode=035720&x=40&y=33"
     for i in range(1, 10):
@@ -181,10 +177,6 @@ if __name__ == "__main__":
                     print("\n\n\n\n")
                 except Exception as e:
                     print(e)
-                break
-            break
-        break
-
 
 pdf_url = "https://ssl.pstatic.net/imgstock/upload/research/company/1695343870257.pdf"
 text_list = read_pdf(pdf_url)
@@ -196,3 +188,4 @@ for text in text_list:
         print("\n\n\n\n")
     except Exception as e:
         print(e)
+

@@ -32,11 +32,23 @@ class Command(BaseCommand):
             type=str,
             help="Type either report or analyst that needs to be calculated",
         )
+        parser.add_argument(
+            "-m",
+            "--max-reports-num",
+            nargs="+",
+            type=int,
+            help="Maximum number of reports per stock to scrape",
+            default=-1,
+        )
 
     def handle(self, *args, **options):
         file_path = options["file"]
         stocks = options["stocks"]
         calculate = options["calculate"]
+        max_reports_num = options["max_reports_num"]
+
+        if isinstance(max_reports_num, list):
+            max_reports_num = max_reports_num[0]  # vs code debug issue
 
         if file_path:
             path = Path(file_path)
@@ -50,11 +62,11 @@ class Command(BaseCommand):
                     stock_name = line.strip()
                     if len(stock_name) == 0:
                         continue
-                    fetch_stock_reports(stock_name)
+                    fetch_stock_reports(stock_name, max_reports_num=max_reports_num)
 
         elif stocks:
             for stock_name in stocks:
-                fetch_stock_reports(stock_name)
+                fetch_stock_reports(stock_name, max_reports_num=max_reports_num)
 
         elif calculate:
             if calculate[0] == "report":

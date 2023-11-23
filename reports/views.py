@@ -1,7 +1,7 @@
 from django.db.models import Min
 from rest_framework import viewsets, generics
 from rest_framework import filters as drf_filters
-from django.db.models import Q  ## OR filter 구현 시 장고가 추천하는 클래스
+from django.db.models import Max, Q
 
 from reports.serializers import (
     PointSerializer,
@@ -37,12 +37,21 @@ class StockReportFilter(filters.FilterSet):
         return queryset.filter(min_hit_rate__gte=value)
 
 
+class CustomOrderingFilter(drf_filters.OrderingFilter):
+    def filter_queryset(self, request, queryset, view):
+        # annotate analyst_max_hit_rate: the maximum hit rate of analysts who wrote the same report
+        queryset = queryset.annotate(
+            analyst_max_hit_rate=Max("writes__analyst__hit_rate")
+        )
+        return super().filter_queryset(request, queryset, view)
+
+
 ## http GET /stocks/:stock_ID/reports/
 class StockReportsView(generics.ListAPIView):
     serializer_class = StockReportSerializer
-    filter_backends = [filters.DjangoFilterBackend, drf_filters.OrderingFilter]
+    filter_backends = [filters.DjangoFilterBackend, CustomOrderingFilter]
     filterset_class = StockReportFilter
-    ordering_fields = ["publish_date", "hit_rate"]
+    ordering_fields = ["publish_date", "hit_rate", "analyst_max_hit_rate"]
     ordering = ["-hit_rate", "-publish_date"]
     pagination_class = CustomPageNumberPagination
 
@@ -97,11 +106,6 @@ class AnalystReportsView(generics.ListAPIView):
 
         else:
             return Report.objects.filter(writes__analyst_id=analyst_id)
-
-
-class StockViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Stock.objects.all()
-    serializer_class = StockSerializer
 
 
 class PointViewSet(viewsets.ReadOnlyModelViewSet):

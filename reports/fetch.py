@@ -582,6 +582,59 @@ def calculate_hit_rate_of_report():
     print(f"{calculationSuccess}개의 리포트 적중률 계산 성공!")
     print(f"{len(reports) - calculationSuccess}개의 리포트 적중률 계산 실패")
 
+def calculate_hit_rate_of_single_analyst(analyst):
+    # BUG: analyst with no related report returns 1(failure)
+
+    analyst_write_instances = Writes.objects.filter(
+            analyst=analyst
+        )  # analyst와 연관된 Writes 뽑기
+    reports = Report.objects.filter(
+        writes__in=analyst_write_instances
+    )  # analyst_write_instances와 연관된 Report 뽑기
+
+    length = len(reports)
+    for r in reports:
+        print(r)
+
+    total = reports.aggregate(
+        total_days_hit=Sum("days_hit"),
+        total_days_missed=Sum("days_missed"),
+        total_days_to_first_hit=Sum("days_to_first_hit"),
+        total_days_to_first_miss=Sum("days_to_first_miss"),
+    )
+
+    days_hit_sum = total["total_days_hit"]
+    days_missed_sum = total["total_days_missed"]
+    days_to_first_hit_sum = total["total_days_to_first_hit"]
+    days_to_first_miss_sum = total["total_days_to_first_miss"]
+
+    print(f"days_hit_sum : {days_hit_sum}")
+    print(f"days_missed_sum : {days_missed_sum}")
+    print(f"days_to_first_hit_sum : {days_to_first_hit_sum}")
+    print(f"days_to_first_miss_sum : {days_to_first_miss_sum}")
+
+    print()
+    print()
+
+    analyst.hit_rate = (
+        days_hit_sum / (days_hit_sum + days_missed_sum)
+        if (days_hit_sum + days_missed_sum)
+        else 0
+    )
+    analyst.avg_days_hit = days_hit_sum / length
+    analyst.avg_days_missed = days_missed_sum / length
+    analyst.avg_days_to_first_hit = days_to_first_hit_sum / length
+    analyst.avg_days_to_first_miss = days_to_first_miss_sum / length
+
+    # save analysts to DB
+    try:
+        analyst.save()
+    except Exception as e:
+        print(f"Exception on saving report: {analyst}")
+        print(e)
+        return 1
+
+    return 0
 
 def calculate_hit_rate_of_analyst():
     calculationSuccess = 0
@@ -594,90 +647,9 @@ def calculate_hit_rate_of_analyst():
     for index, analyst in enumerate(analysts):
         print(f"애널리스트 적중률 계산 중 {index+1}/{len(analysts)} \r", end="")
 
-        # reports = [
-        #     write.report
-        #     for write in Writes.objects.filter(analyst=analyst)
-        #     if write.report.hit_rate
-        # ]
-
-        analyst_write_instances = Writes.objects.filter(
-            analyst=analyst
-        )  # analyst와 연관된 Writes 뽑기
-        reports = Report.objects.filter(
-            writes__in=analyst_write_instances
-        )  # analyst_write_instances와 연관된 Report 뽑기
-
-        # days_hit_sum = 0
-        # days_missed_sum = 0
-        # days_to_first_hit_sum = 0
-        # days_to_first_miss_sum = 0
-
-        length = len(reports)
-
-        # if length == 0:
-        #     continue
-
-        # for report in reports:
-        #     days_hit_sum += report.days_hit
-        #     days_missed_sum += report.days_missed
-        #     days_to_first_hit_sum += report.days_to_first_hit
-        #     days_to_first_miss_sum += report.days_to_first_miss
-
-        total = reports.aggregate(
-            total_days_hit=Sum("days_hit"),
-            total_days_missed=Sum("days_missed"),
-            total_days_to_first_hit=Sum("days_to_first_hit"),
-            total_days_to_first_miss=Sum("days_to_first_miss"),
-        )
-
-        days_hit_sum = total["total_days_hit"]
-        days_missed_sum = total["total_days_missed"]
-        days_to_first_hit_sum = total["total_days_to_first_hit"]
-        days_to_first_miss_sum = total["total_days_to_first_miss"]
-
-        if not (
-            days_hit_sum
-            and days_missed_sum
-            and days_to_first_hit_sum
-            and days_to_first_miss_sum
-        ):
-            continue
-
-        print(f"days_hit_sum : {days_hit_sum}")
-        print(f"days_missed_sum : {days_missed_sum}")
-        print(f"days_to_first_hit_sum : {days_to_first_hit_sum}")
-        print(f"days_to_first_miss_sum : {days_to_first_miss_sum}")
-
-        print()
-        print()
-
-        analyst.hit_rate = (
-            days_hit_sum / (days_hit_sum + days_missed_sum)
-            if (days_hit_sum + days_missed_sum)
-            else 0
-        )
-        analyst.avg_days_hit = days_hit_sum / length
-        analyst.avg_days_missed = days_missed_sum / length
-        analyst.avg_days_to_first_hit = days_to_first_hit_sum / length
-        analyst.avg_days_to_first_miss = days_to_first_miss_sum / length
-
-        # print(f"analyst.hit_rate : {analyst.hit_rate}")
-        # print(f"analyst.avg_days_hit : {analyst.avg_days_hit}")
-        # print(f"analyst.avg_days_missed : {analyst.avg_days_missed}")
-        # print(f"analyst.avg_days_to_first_hit : {analyst.avg_days_to_first_hit}")
-        # print(f"analyst.avg_days_to_first_miss : {analyst.avg_days_to_first_miss}")
-
-        # print()
-        # print()
-
-        # save analysts to DB
-        try:
-            analyst.save()
+        if calculate_hit_rate_of_single_analyst(analyst) == 0:
             calculationSuccess += 1
-        except Exception as e:
-            print(f"Exception on saving analyst: {analyst}")
-            print(e)
-            break
+
 
     print(f"{len(analysts)}명의 애널리스트 중..")
     print(f"{calculationSuccess}명의 애널리스트 적중률 계산 성공!")
